@@ -1,0 +1,22 @@
+name: OMERO
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: '0 0 * * 0'
+jobs:
+  test:
+    name: Run integration tests against OMERO
+    runs-on: ubuntu-22.04
+    env:
+      STAGE: app
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout omero-test-infra
+        uses: actions/checkout@master
+        with:
+          repository: ome/omero-test-infra
+          path: .omero
+          ref: master
+      - name: Build and run OMERO tests
+        run: .omero/docker $STAGE

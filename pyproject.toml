@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools"]
+
+[project]
+name = "omero-duplicator"
+version = "0.1.0"
+description = "OMERO.web plugin: duplicate a Dataset, Image, or Project from the browser, no CLI required"
+readme = "README.md"
+authors = [{name = "Joao Miguel"}]
+license = {file = "LICENSE"}
+keywords = ["omero", "omero-web"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Plugins",
+    "Framework :: Django",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "Natural Language :: English",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+requires-python = ">= 3.9"
+
+[project.urls]
+Repository = "https://github.com/Jcarlosmiguel/omero-duplicator"
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.setuptools.packages.find]
+include = ["omero_duplicator*"]

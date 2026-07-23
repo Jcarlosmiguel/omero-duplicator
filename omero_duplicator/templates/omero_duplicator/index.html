@@ -1,0 +1,64 @@
+{% extends "webclient/base/base_container.html" %}
+
+{% block title %}Duplicator{% endblock %}
+
+{% block center %}
+<style>
+  .duplicator-wrap {
+    padding: 1.5rem;
+    max-width: 640px;
+  }
+  .duplicator-wrap .field {
+    margin-bottom: 0.85rem;
+  }
+  .duplicator-message {
+    padding: 0.85rem 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    white-space: pre-line;
+  }
+  .duplicator-message.success {
+    background: #eaf6ec;
+    border: 1px solid #bfe3c6;
+    color: #1e4620;
+  }
+  .duplicator-message.error {
+    background: #fdecea;
+    border: 1px solid #f5c2c0;
+    color: #611a15;
+  }
+</style>
+
+<div class="duplicator-wrap">
+  <h1>Duplicate a Dataset, Image, or Project</h1>
+  <p>Creates an independent copy. Nothing about the original is changed or removed.</p>
+
+  {% if error %}
+    <div class="duplicator-message error">{{ error }}</div>
+  {% endif %}
+  {% if success %}
+    <div class="duplicator-message success">{{ success }}</div>
+  {% endif %}
+
+  <form method="post" action="{% url 'omero_duplicator_run' %}">
+    {% csrf_token %}
+    <div class="field">
+      <label for="obj_type"><strong>Type</strong></label><br/>
+      <select name="obj_type" id="obj_type">
+        <option value="Dataset" {% if obj_type == "Dataset" %}selected{% endif %}>Dataset</option>
+        <option value="Image" {% if obj_type == "Image" %}selected{% endif %}>Image</option>
+        <option value="Project" {% if obj_type == "Project" %}selected{% endif %}>Project</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="obj_id"><strong>ID</strong></label><br/>
+      <input type="text" name="obj_id" id="obj_id" value="{{ obj_id|default:'' }}" placeholder="e.g. 851">
+      <br/><small>Also accepts a comma-separated list, e.g. 1376,1377,1378</small>
+    </div>
+    <div class="field">
+      <button type="submit" name="dry_run" value="1">Preview (safe, makes no changes)</button>
+      <button type="submit" name="dry_run" value="0">Duplicate for real</button>
+    </div>
+  </form>
+</div>
+{% endblock %}
