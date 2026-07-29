@@ -9,7 +9,7 @@
 - "Skip annotations" and "Skip ROIs" options, for a duplicate that doesn't
   need to carry those along.
 
-Both suggested by Tom Boissonnet (TomTBT) on the
+Both suggested by [Tom Boissonnet](https://github.com/Tom-TBT) on the
 [image.sc forum thread](https://forum.image.sc/t/omero-web-plugin-for-the-duplicator/121966) -
 thank you!
 
