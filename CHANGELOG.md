@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- Detailed dry-run/duplicate report: shows a grouped breakdown of exactly
+  what would be (or was) duplicated - Annotations, ROIs, Fileset, and
+  Microscope metadata, with an "Other" catch-all for anything not in those
+  categories - instead of just a one-line summary.
+- "Skip annotations" and "Skip ROIs" options, for a duplicate that doesn't
+  need to carry those along.
+
+Both suggested by Tom Boissonnet (TomTBT) on the
+[image.sc forum thread](https://forum.image.sc/t/omero-web-plugin-for-the-duplicator/121966) -
+thank you!
+
 ## 0.1.0 (July 2026)
 
 - Initial release.

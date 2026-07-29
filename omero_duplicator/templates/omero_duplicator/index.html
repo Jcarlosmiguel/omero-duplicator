@@ -27,6 +27,26 @@
     border: 1px solid #f5c2c0;
     color: #611a15;
   }
+  .duplicator-breakdown {
+    margin-bottom: 1rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 0.85rem 1rem;
+  }
+  .duplicator-breakdown h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1rem;
+  }
+  .duplicator-breakdown-category {
+    margin-bottom: 0.6rem;
+  }
+  .duplicator-breakdown-category:last-child {
+    margin-bottom: 0;
+  }
+  .duplicator-breakdown-category ul {
+    margin: 0.2rem 0 0;
+    padding-left: 1.3rem;
+  }
 </style>
 
 <div class="duplicator-wrap">
@@ -38,6 +58,21 @@
   {% endif %}
   {% if success %}
     <div class="duplicator-message success">{{ success }}</div>
+  {% endif %}
+  {% if success and breakdown %}
+    <div class="duplicator-breakdown">
+      <h3>What {% if dry_run %}would be{% else %}was{% endif %} duplicated</h3>
+      {% for category, items in breakdown.items %}
+        <div class="duplicator-breakdown-category">
+          <strong>{{ category }}</strong>
+          <ul>
+            {% for class_name, count in items %}
+              <li>{{ class_name }}: {{ count }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endfor %}
+    </div>
   {% endif %}
 
   <form method="post" action="{% url 'omero_duplicator_run' %}">
@@ -54,6 +89,17 @@
       <label for="obj_id"><strong>ID</strong></label><br/>
       <input type="text" name="obj_id" id="obj_id" value="{{ obj_id|default:'' }}" placeholder="e.g. 851">
       <br/><small>Also accepts a comma-separated list, e.g. 1376,1377,1378</small>
+    </div>
+    <div class="field">
+      <label>
+        <input type="checkbox" name="skip_annotations" value="1" {% if skip_annotations %}checked{% endif %}>
+        Skip annotations
+      </label>
+      <br/>
+      <label>
+        <input type="checkbox" name="skip_rois" value="1" {% if skip_rois %}checked{% endif %}>
+        Skip ROIs
+      </label>
     </div>
     <div class="field">
       <button type="submit" name="dry_run" value="1">Preview (safe, makes no changes)</button>

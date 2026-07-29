@@ -17,6 +17,7 @@
 #
 
 import re
+from collections import OrderedDict
 
 import omero
 import omero.callbacks
@@ -32,6 +33,29 @@ FILESET_CONFLICT_RE = re.compile(
 
 VALID_TYPES = ("Dataset", "Image", "Project")
 
+# Ignoring a linked-to class (e.g. Annotation) directly does not work as
+# expected under OMERO's group permissions - the *link* class has to be
+# ignored instead (confirmed against the real omero-cli-duplicate plugin's
+# own --help text). Roi is the exception: it has no separate link class, so
+# ignoring it directly works.
+ANNOTATION_LINK_TYPES = ("ImageAnnotationLink", "DatasetAnnotationLink", "ProjectAnnotationLink")
+ROI_TYPES = ("Roi",)
+
+# Groups the dotted class-path keys in an omero.cmd.Duplicate response's
+# `duplicates` dict (e.g. "ome.model.core.Image") into a human-readable
+# report, instead of the flat one-line summary shown before - see
+# notes/forum-feedback-plan.md for why. Order here is also the order
+# categories are shown in, when present.
+_ANNOTATION_SUFFIXES = ("AnnotationLink", "Annotation")
+_ROI_CLASSES = {"Roi", "Rectangle", "Ellipse", "Line", "Point", "Polygon", "Polyline", "Mask", "Label"}
+_FILESET_CLASSES = {"Fileset", "FilesetEntry", "FilesetJobLink", "OriginalFile", "JobOriginalFileLink"}
+_MICROSCOPE_CLASSES = {
+    "Instrument", "Microscope", "Detector", "DetectorSettings", "Objective", "ObjectiveSettings",
+    "LogicalChannel", "Channel", "Filter", "FilterSet", "Laser", "LightSource", "LightSourceSettings",
+    "Dichroic", "StageLabel", "ImagingEnvironment", "TransmittanceRange", "Arc", "LightEmittingDiode",
+}
+_CATEGORY_ORDER = ("Annotations", "ROIs", "Fileset", "Microscope metadata", "Other")
+
 
 def _get_fileset_image_ids(conn, fileset_id):
     query = "select i.id from Image i where i.fileset.id = :fid"
@@ -41,10 +65,41 @@ def _get_fileset_image_ids(conn, fileset_id):
     return [r[0].val for r in results]
 
 
-def _submit_duplicate(conn, obj_type, obj_ids, dry_run):
+def _categorize_class(class_name):
+    if class_name.endswith(_ANNOTATION_SUFFIXES):
+        return "Annotations"
+    if class_name in _ROI_CLASSES:
+        return "ROIs"
+    if class_name in _FILESET_CLASSES or class_name.endswith("Job"):
+        return "Fileset"
+    if class_name in _MICROSCOPE_CLASSES:
+        return "Microscope metadata"
+    return "Other"
+
+
+def _categorize_duplicates(duplicates):
+    """Turns a Duplicate response's raw `duplicates` dict into an ordered
+    {category: [(class_name, count), ...]} report. Deliberately keeps
+    unmatched classes in an "Other" bucket rather than dropping them - the
+    exact set of types OMERO duplicates can vary by server version/config,
+    and silently hiding unknown ones would make the report misleading
+    rather than just incomplete.
+    """
+    grouped = OrderedDict((cat, []) for cat in _CATEGORY_ORDER)
+    for key, ids in (duplicates or {}).items():
+        if not ids:
+            continue
+        class_name = key.rsplit(".", 1)[-1]
+        grouped[_categorize_class(class_name)].append((class_name, len(ids)))
+    return OrderedDict((cat, sorted(items)) for cat, items in grouped.items() if items)
+
+
+def _submit_duplicate(conn, obj_type, obj_ids, dry_run, types_to_ignore=None):
     req = omero.cmd.Duplicate()
     req.targetObjects = {obj_type: obj_ids}
     req.dryRun = dry_run
+    if types_to_ignore:
+        req.typesToIgnore = list(types_to_ignore)
 
     handle = conn.c.sf.submit(req)
     cb = omero.callbacks.CmdCallbackI(conn.c, handle)
@@ -87,12 +142,22 @@ def run_duplicate(request, conn=None, **kwargs):
     obj_type = request.POST.get("obj_type", "").strip()
     obj_id = request.POST.get("obj_id", "").strip()
     dry_run = request.POST.get("dry_run") == "1"
+    skip_annotations = request.POST.get("skip_annotations") == "1"
+    skip_rois = request.POST.get("skip_rois") == "1"
+
+    types_to_ignore = []
+    if skip_annotations:
+        types_to_ignore.extend(ANNOTATION_LINK_TYPES)
+    if skip_rois:
+        types_to_ignore.extend(ROI_TYPES)
 
     context = {
         "template": "omero_duplicator/index.html",
         "obj_type": obj_type,
         "obj_id": obj_id,
         "dry_run": dry_run,
+        "skip_annotations": skip_annotations,
+        "skip_rois": skip_rois,
         "submitted": True,
     }
 
@@ -103,7 +168,7 @@ def run_duplicate(request, conn=None, **kwargs):
     obj_ids = [int(p) for p in id_parts]
 
     try:
-        rsp = _submit_duplicate(conn, obj_type, obj_ids, dry_run)
+        rsp = _submit_duplicate(conn, obj_type, obj_ids, dry_run, types_to_ignore=types_to_ignore)
     except Exception as exc:
         context["error"] = "Unexpected error talking to OMERO: %s" % exc
         return context
@@ -133,6 +198,7 @@ def run_duplicate(request, conn=None, **kwargs):
 
     new_ids = _extract_new_ids(rsp.duplicates, obj_type)
     original_str = ",".join(str(i) for i in obj_ids)
+    context["breakdown"] = _categorize_duplicates(rsp.duplicates)
     if dry_run:
         # A dry run's "duplicates" report echoes the original IDs
         # themselves (nothing new actually gets created), so there's no
