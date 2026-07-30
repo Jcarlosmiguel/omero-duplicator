@@ -1,8 +1,8 @@
-{% extends "webclient/base/base_container.html" %}
+{% extends "webgateway/base/base_header.html" %}
 
 {% block title %}Duplicator{% endblock %}
 
-{% block center %}
+{% block content %}
 <style>
   .duplicator-wrap {
     padding: 1.5rem;
@@ -27,6 +27,11 @@
     border: 1px solid #f5c2c0;
     color: #611a15;
   }
+  .duplicator-message.pending {
+    background: #eef3fb;
+    border: 1px solid #c9d9f0;
+    color: #1a3a63;
+  }
   .duplicator-breakdown {
     margin-bottom: 1rem;
     border: 1px solid #ddd;
@@ -47,35 +52,19 @@
     margin: 0.2rem 0 0;
     padding-left: 1.3rem;
   }
+  .duplicator-new-objects {
+    margin: 0 0 1rem;
+    padding-left: 1.3rem;
+  }
 </style>
 
 <div class="duplicator-wrap">
   <h1>Duplicate a Dataset, Image, or Project</h1>
   <p>Creates an independent copy. Nothing about the original is changed or removed.</p>
 
-  {% if error %}
-    <div class="duplicator-message error">{{ error }}</div>
-  {% endif %}
-  {% if success %}
-    <div class="duplicator-message success">{{ success }}</div>
-  {% endif %}
-  {% if success and breakdown %}
-    <div class="duplicator-breakdown">
-      <h3>What {% if dry_run %}would be{% else %}was{% endif %} duplicated</h3>
-      {% for category, items in breakdown.items %}
-        <div class="duplicator-breakdown-category">
-          <strong>{{ category }}</strong>
-          <ul>
-            {% for class_name, count in items %}
-              <li>{{ class_name }}: {{ count }}</li>
-            {% endfor %}
-          </ul>
-        </div>
-      {% endfor %}
-    </div>
-  {% endif %}
+  <div id="duplicator-result"></div>
 
-  <form method="post" action="{% url 'omero_duplicator_run' %}">
+  <form id="duplicator-form">
     {% csrf_token %}
     <div class="field">
       <label for="obj_type"><strong>Type</strong></label><br/>
@@ -92,12 +81,12 @@
     </div>
     <div class="field">
       <label>
-        <input type="checkbox" name="skip_annotations" value="1" {% if skip_annotations %}checked{% endif %}>
+        <input type="checkbox" name="skip_annotations" id="skip_annotations">
         Skip annotations
       </label>
       <br/>
       <label>
-        <input type="checkbox" name="skip_rois" value="1" {% if skip_rois %}checked{% endif %}>
+        <input type="checkbox" name="skip_rois" id="skip_rois">
         Skip ROIs
       </label>
     </div>
@@ -107,4 +96,154 @@
     </div>
   </form>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById("duplicator-form");
+  var result = document.getElementById("duplicator-result");
+  var buttons = form.querySelectorAll("button[type=submit]");
+  var POLL_INTERVAL_MS = 2000;
+  var CHECK_URL = "{% url 'omero_duplicator_check' %}";
+
+  function setButtonsDisabled(disabled) {
+    buttons.forEach(function (b) { b.disabled = disabled; });
+  }
+
+  function renderPending(jobId) {
+    result.innerHTML = "";
+    var div = document.createElement("div");
+    div.className = "duplicator-message pending";
+    div.textContent = "Duplicating... this can take a while for large datasets (job " + jobId + ").";
+    result.appendChild(div);
+  }
+
+  function renderBreakdown(breakdown, dryRun) {
+    var wrap = document.createElement("div");
+    wrap.className = "duplicator-breakdown";
+
+    var h3 = document.createElement("h3");
+    h3.textContent = "What " + (dryRun ? "would be" : "was") + " duplicated";
+    wrap.appendChild(h3);
+
+    for (var category in breakdown) {
+      if (!breakdown.hasOwnProperty(category)) {
+        continue;
+      }
+      var catDiv = document.createElement("div");
+      catDiv.className = "duplicator-breakdown-category";
+
+      var strong = document.createElement("strong");
+      strong.textContent = category;
+      catDiv.appendChild(strong);
+
+      var ul = document.createElement("ul");
+      breakdown[category].forEach(function (item) {
+        var className = item[0], count = item[1], ids = item[2];
+        var li = document.createElement("li");
+        li.title = ids.join(",");
+        li.textContent = count + " " + className + (count === 1 ? "" : "s");
+        ul.appendChild(li);
+      });
+      catDiv.appendChild(ul);
+
+      wrap.appendChild(catDiv);
+    }
+
+    return wrap;
+  }
+
+  function renderNewObjects(newObjects) {
+    var ul = document.createElement("ul");
+    ul.className = "duplicator-new-objects";
+    newObjects.forEach(function (obj) {
+      var li = document.createElement("li");
+      var a = document.createElement("a");
+      a.href = obj.url;
+      a.textContent = "Open new object (id " + obj.id + ")";
+      li.appendChild(a);
+      ul.appendChild(li);
+    });
+    return ul;
+  }
+
+  function renderResult(data, dryRun) {
+    result.innerHTML = "";
+
+    if (data.error) {
+      var errDiv = document.createElement("div");
+      errDiv.className = "duplicator-message error";
+      errDiv.textContent = data.error;
+      result.appendChild(errDiv);
+      return;
+    }
+
+    var successDiv = document.createElement("div");
+    successDiv.className = "duplicator-message success";
+    successDiv.textContent = data.success;
+    result.appendChild(successDiv);
+
+    if (data.new_objects && data.new_objects.length) {
+      result.appendChild(renderNewObjects(data.new_objects));
+    }
+
+    if (data.breakdown && Object.keys(data.breakdown).length) {
+      result.appendChild(renderBreakdown(data.breakdown, dryRun));
+    }
+  }
+
+  function poll(jobId, dryRun) {
+    fetch(CHECK_URL + "?job_id=" + encodeURIComponent(jobId), {
+      credentials: "same-origin"
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.finished) {
+          window.setTimeout(function () { poll(jobId, dryRun); }, POLL_INTERVAL_MS);
+          return;
+        }
+        setButtonsDisabled(false);
+        renderResult(data, dryRun);
+      })
+      .catch(function (err) {
+        setButtonsDisabled(false);
+        renderResult({error: "Lost contact with the server while checking progress: " + err}, dryRun);
+      });
+  }
+
+  form.addEventListener("submit", function (event) {
+    event.preventDefault();
+
+    var submitter = event.submitter;
+    var dryRun = submitter ? submitter.value : "1";
+
+    var formData = new FormData(form);
+    formData.set("dry_run", dryRun);
+    formData.set("skip_annotations", document.getElementById("skip_annotations").checked ? "1" : "0");
+    formData.set("skip_rois", document.getElementById("skip_rois").checked ? "1" : "0");
+
+    setButtonsDisabled(true);
+    result.innerHTML = "";
+
+    fetch("{% url 'omero_duplicator_run' %}", {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.error) {
+          setButtonsDisabled(false);
+          renderResult(data, dryRun === "1");
+          return;
+        }
+        renderPending(data.job_id);
+        window.setTimeout(function () { poll(data.job_id, dryRun === "1"); }, POLL_INTERVAL_MS);
+      })
+      .catch(function (err) {
+        setButtonsDisabled(false);
+        renderResult({error: "Lost contact with the server while submitting: " + err}, dryRun === "1");
+      });
+  });
+})();
+</script>
 {% endblock %}

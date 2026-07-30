@@ -23,4 +23,9 @@ from . import views
 urlpatterns = [
     re_path(r"^$", views.index, name="omero_duplicator_index"),
     re_path(r"^run$", views.run_duplicate, name="omero_duplicator_run"),
+    # job_id is a stringified Ice proxy (e.g. "abc/def -t -e 1.1:tcp -h ...
+    # -p 4064") - it can contain spaces, colons and slashes, so it goes in
+    # the query string (like OMERO.web's own activities() jobId), never as
+    # a raw URL path segment.
+    re_path(r"^check$", views.check_duplicate, name="omero_duplicator_check"),
 ]

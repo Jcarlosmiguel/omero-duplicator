@@ -57,7 +57,7 @@ omero config append omero.web.apps '"omero_duplicator"'
 
 omero config append omero.web.ui.top_links '["Duplicator", "omero_duplicator_index", {"title": "Duplicate a Dataset, Image, or Project (opens in a new tab)", "target": "_blank"}]'
 
-omero config append omero.web.open_with '["omero_duplicator", "omero_duplicator_index", {"supported_objects": ["images", "datasets", "projects"], "script_url": "omero_duplicator/openwith.js", "label": "Duplicator", "target": "_blank"}]'
+omero config append omero.web.open_with '["omero_duplicator", "omero_duplicator_index", {"supported_objects": ["images", "datasets", "projects"], "script_url": "omero_duplicator/openwith.js", "label": "Duplicator"}]'
 ```
 
 Restart `omero-web`.
