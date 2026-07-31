@@ -29,5 +29,17 @@ Repository = "https://github.com/Jcarlosmiguel/omero-duplicator"
 [project.optional-dependencies]
 test = ["pytest", "pytest-django", "pytest-mock"]
 
+[tool.pytest.ini_options]
+# The CI harness (omero-test-infra) both pip-installs this package into
+# site-packages AND runs pytest from the separate git checkout - without
+# this, Django importing "omero_duplicator" (for INSTALLED_APPS) from the
+# installed copy, followed by pytest trying to import
+# omero_duplicator.tests.test_views from the checkout, hits pytest's
+# classic "import file mismatch" (same dotted name, two different
+# on-disk files). importlib mode identifies each test file by its own
+# path rather than by package name, avoiding the collision entirely -
+# see https://docs.pytest.org/en/stable/explanation/pythonpath.html
+addopts = "--import-mode=importlib"
+
 [tool.setuptools.packages.find]
 include = ["omero_duplicator*"]
