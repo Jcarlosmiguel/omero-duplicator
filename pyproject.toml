@@ -27,7 +27,7 @@ requires-python = ">= 3.9"
 Repository = "https://github.com/Jcarlosmiguel/omero-duplicator"
 
 [project.optional-dependencies]
-test = ["pytest"]
+test = ["pytest", "pytest-django", "pytest-mock"]
 
 [tool.setuptools.packages.find]
 include = ["omero_duplicator*"]

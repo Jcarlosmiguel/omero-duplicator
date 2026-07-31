@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Added a real test suite (`omero_duplicator/tests/test_views.py`, 29
+  tests) - previously had none, which is what let the flake8/rst-lint CI
+  failures below go unnoticed for as long as they did.
 - Detailed dry-run/duplicate report: shows a grouped breakdown of exactly
   what would be (or was) duplicated - Annotations, ROIs, Fileset, and
   Microscope metadata, with an "Other" catch-all for anything not in those
