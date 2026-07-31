@@ -32,7 +32,8 @@ from omeroweb.webclient.decorators import login_required, render_response
 # Image can't be duplicated on its own because it shares a Fileset (the same
 # source file produced more than one OMERO Image) with others.
 FILESET_CONFLICT_RE = re.compile(
-    r"within Fileset\[(\d+)\] may not duplicate Image\[(\d+)\] without Image\[(\d+)\] also"
+    r"within Fileset\[(\d+)\] may not duplicate Image\[(\d+)\] without "
+    r"Image\[(\d+)\] also"
 )
 
 VALID_TYPES = ("Dataset", "Image", "Project")
@@ -42,7 +43,11 @@ VALID_TYPES = ("Dataset", "Image", "Project")
 # ignored instead (confirmed against the real omero-cli-duplicate plugin's
 # own --help text). Roi is the exception: it has no separate link class, so
 # ignoring it directly works.
-ANNOTATION_LINK_TYPES = ("ImageAnnotationLink", "DatasetAnnotationLink", "ProjectAnnotationLink")
+ANNOTATION_LINK_TYPES = (
+    "ImageAnnotationLink",
+    "DatasetAnnotationLink",
+    "ProjectAnnotationLink",
+)
 ROI_TYPES = ("Roi",)
 
 # Groups the dotted class-path keys in an omero.cmd.Duplicate response's
@@ -51,21 +56,33 @@ ROI_TYPES = ("Roi",)
 # notes/forum-feedback-plan.md for why. Order here is also the order
 # categories are shown in, when present.
 _ANNOTATION_SUFFIXES = ("AnnotationLink", "Annotation")
-_ROI_CLASSES = {"Roi", "Rectangle", "Ellipse", "Line", "Point", "Polygon", "Polyline", "Mask", "Label"}
-_FILESET_CLASSES = {"Fileset", "FilesetEntry", "FilesetJobLink", "OriginalFile", "JobOriginalFileLink"}
-_MICROSCOPE_CLASSES = {
-    "Instrument", "Microscope", "Detector", "DetectorSettings", "Objective", "ObjectiveSettings",
-    "LogicalChannel", "Channel", "Filter", "FilterSet", "Laser", "LightSource", "LightSourceSettings",
-    "Dichroic", "StageLabel", "ImagingEnvironment", "TransmittanceRange", "Arc", "LightEmittingDiode",
+_ROI_CLASSES = {
+    "Roi", "Rectangle", "Ellipse", "Line", "Point", "Polygon", "Polyline",
+    "Mask", "Label",
 }
-_CATEGORY_ORDER = ("Annotations", "ROIs", "Fileset", "Microscope metadata", "Other")
+_FILESET_CLASSES = {
+    "Fileset", "FilesetEntry", "FilesetJobLink", "OriginalFile",
+    "JobOriginalFileLink",
+}
+_MICROSCOPE_CLASSES = {
+    "Instrument", "Microscope", "Detector", "DetectorSettings",
+    "Objective", "ObjectiveSettings", "LogicalChannel", "Channel",
+    "Filter", "FilterSet", "Laser", "LightSource", "LightSourceSettings",
+    "Dichroic", "StageLabel", "ImagingEnvironment", "TransmittanceRange",
+    "Arc", "LightEmittingDiode",
+}
+_CATEGORY_ORDER = (
+    "Annotations", "ROIs", "Fileset", "Microscope metadata", "Other",
+)
 
 
 def _get_fileset_image_ids(conn, fileset_id):
     query = "select i.id from Image i where i.fileset.id = :fid"
     params = omero.sys.ParametersI()
     params.addLong("fid", int(fileset_id))
-    results = conn.getQueryService().projection(query, params, conn.SERVICE_OPTS)
+    results = conn.getQueryService().projection(
+        query, params, conn.SERVICE_OPTS
+    )
     return [r[0].val for r in results]
 
 
@@ -98,8 +115,12 @@ def _categorize_duplicates(duplicates):
         if not ids:
             continue
         class_name = key.rsplit(".", 1)[-1]
-        grouped[_categorize_class(class_name)].append((class_name, len(ids), list(ids)))
-    return OrderedDict((cat, sorted(items)) for cat, items in grouped.items() if items)
+        grouped[_categorize_class(class_name)].append(
+            (class_name, len(ids), list(ids))
+        )
+    return OrderedDict(
+        (cat, sorted(items)) for cat, items in grouped.items() if items
+    )
 
 
 def _submit_duplicate(conn, obj_type, obj_ids, dry_run, types_to_ignore=None):
@@ -148,7 +169,10 @@ def _new_object_links(obj_type, new_ids):
     ?show=type-id query string that the webclient tree understands."""
     base_url = reverse("webindex")
     return [
-        {"id": new_id, "url": "%s?show=%s-%s" % (base_url, obj_type.lower(), new_id)}
+        {
+            "id": new_id,
+            "url": "%s?show=%s-%s" % (base_url, obj_type.lower(), new_id),
+        }
         for new_id in new_ids
     ]
 
@@ -165,16 +189,20 @@ def _build_result(conn, obj_type, obj_ids, dry_run, rsp):
             sibling_ids = _get_fileset_image_ids(conn, fileset_id)
             if sibling_ids:
                 error = (
-                    "This slide is part of a group of %d related images stored "
-                    "together (the same original file produced all of them). "
-                    "OMERO requires duplicating them together. Set Type to Image "
-                    "and enter this as the ID: %s"
-                    % (len(sibling_ids), ",".join(str(i) for i in sibling_ids))
+                    "This slide is part of a group of %d related "
+                    "images stored together (the same original file "
+                    "produced all of them). OMERO requires duplicating "
+                    "them together. Set Type to Image and enter this "
+                    "as the ID: %s"
+                    % (
+                        len(sibling_ids),
+                        ",".join(str(i) for i in sibling_ids),
+                    )
                 )
             else:
                 error = (
-                    "This slide is part of a group of related images and can't "
-                    "be duplicated on its own."
+                    "This slide is part of a group of related images "
+                    "and can't be duplicated on its own."
                 )
         else:
             error = "OMERO couldn't complete this: %s" % (message or rsp.name)
@@ -190,9 +218,9 @@ def _build_result(conn, obj_type, obj_ids, dry_run, rsp):
         # A dry run's "duplicates" report echoes the original IDs
         # themselves (nothing new actually gets created), so there's no
         # real "new ID" to show yet - just confirm what would happen.
-        result["success"] = "Preview only - nothing was changed. Would duplicate %s:%s." % (
-            obj_type,
-            original_str,
+        result["success"] = (
+            "Preview only - nothing was changed. Would duplicate %s:%s."
+            % (obj_type, original_str)
         )
     elif new_ids:
         result["success"] = "Duplicated %s:%s -> new %s:%s" % (
@@ -246,16 +274,24 @@ def run_duplicate(request, conn=None, **kwargs):
         types_to_ignore.extend(ROI_TYPES)
 
     id_parts = [p.strip() for p in obj_id.split(",") if p.strip()]
-    if obj_type not in VALID_TYPES or not id_parts or not all(p.isdigit() for p in id_parts):
-        return JsonResponse(
-            {"error": "Please provide a valid type and a numeric ID (or comma-separated IDs)."}
-        )
+    valid_ids = id_parts and all(p.isdigit() for p in id_parts)
+    if obj_type not in VALID_TYPES or not valid_ids:
+        return JsonResponse({
+            "error": (
+                "Please provide a valid type and a numeric ID "
+                "(or comma-separated IDs)."
+            )
+        })
     obj_ids = [int(p) for p in id_parts]
 
     try:
-        handle = _submit_duplicate(conn, obj_type, obj_ids, dry_run, types_to_ignore=types_to_ignore)
+        handle = _submit_duplicate(
+            conn, obj_type, obj_ids, dry_run, types_to_ignore=types_to_ignore
+        )
     except Exception as exc:
-        return JsonResponse({"error": "Unexpected error talking to OMERO: %s" % exc})
+        return JsonResponse({
+            "error": "Unexpected error talking to OMERO: %s" % exc
+        })
 
     job_id = str(handle)
     _job_store(request)[job_id] = {
@@ -278,10 +314,13 @@ def check_duplicate(request, conn=None, **kwargs):
     job_id = request.GET.get("job_id", "")
     job = _job_store(request).get(job_id)
     if job is None:
-        return JsonResponse({"finished": True, "error": "Unknown or expired job."})
+        return JsonResponse({
+            "finished": True, "error": "Unknown or expired job."
+        })
 
     try:
-        handle = omero.cmd.HandlePrx.checkedCast(conn.c.ic.stringToProxy(job_id))
+        proxy = conn.c.ic.stringToProxy(job_id)
+        handle = omero.cmd.HandlePrx.checkedCast(proxy)
         cb = omero.callbacks.CmdCallbackI(conn.c, handle)
         rsp = cb.getResponse()
     except Ice.ObjectNotExistException:
@@ -290,11 +329,17 @@ def check_duplicate(request, conn=None, **kwargs):
         # raced with this one. Nothing more to report.
         _job_store(request).pop(job_id, None)
         request.session.modified = True
-        return JsonResponse({"finished": True, "error": "Job result is no longer available."})
+        return JsonResponse({
+            "finished": True,
+            "error": "Job result is no longer available.",
+        })
     except Exception as exc:
         _job_store(request).pop(job_id, None)
         request.session.modified = True
-        return JsonResponse({"finished": True, "error": "Unexpected error talking to OMERO: %s" % exc})
+        return JsonResponse({
+            "finished": True,
+            "error": "Unexpected error talking to OMERO: %s" % exc,
+        })
 
     if rsp is None:
         cb.close(False)
@@ -304,4 +349,7 @@ def check_duplicate(request, conn=None, **kwargs):
     _job_store(request).pop(job_id, None)
     request.session.modified = True
 
-    return JsonResponse(_build_result(conn, job["obj_type"], job["obj_ids"], job["dry_run"], rsp))
+    result = _build_result(
+        conn, job["obj_type"], job["obj_ids"], job["dry_run"], rsp
+    )
+    return JsonResponse(result)
