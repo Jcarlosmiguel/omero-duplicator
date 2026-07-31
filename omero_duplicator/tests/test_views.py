@@ -48,10 +48,10 @@ class FakeRequest:
     """Minimal stand-in for a Django request with a session dict - enough
     for every view/helper here."""
 
-    def __init__(self, method="GET", GET=None, POST=None):
+    def __init__(self, method="GET", get_params=None, post_params=None):
         self.method = method
-        self.GET = GET or {}
-        self.POST = POST or {}
+        self.GET = get_params or {}
+        self.POST = post_params or {}
         self.session = FakeSession()
 
 
@@ -200,14 +200,18 @@ def test_build_result_generic_err_falls_back_to_message():
 # --- index() ---------------------------------------------------------
 
 def test_index_prefills_valid_type_and_id():
-    request = FakeRequest(GET={"obj_type": "Dataset", "obj_id": "42"})
+    request = FakeRequest(
+        get_params={"obj_type": "Dataset", "obj_id": "42"}
+    )
     context = raw_index(request, conn=None)
     assert context["obj_type"] == "Dataset"
     assert context["obj_id"] == "42"
 
 
 def test_index_ignores_invalid_type():
-    request = FakeRequest(GET={"obj_type": "NotARealType", "obj_id": "42"})
+    request = FakeRequest(
+        get_params={"obj_type": "NotARealType", "obj_id": "42"}
+    )
     context = raw_index(request, conn=None)
     assert "obj_type" not in context
     assert context["obj_id"] == "42"
@@ -217,7 +221,7 @@ def test_index_ignores_invalid_type():
 
 def test_run_duplicate_rejects_invalid_type():
     request = FakeRequest(
-        POST={"obj_type": "Bogus", "obj_id": "1", "dry_run": "1"}
+        post_params={"obj_type": "Bogus", "obj_id": "1", "dry_run": "1"}
     )
     response = raw_run_duplicate(request, conn=None)
     assert "error" in json.loads(response.content)
@@ -225,14 +229,14 @@ def test_run_duplicate_rejects_invalid_type():
 
 def test_run_duplicate_rejects_non_numeric_id():
     request = FakeRequest(
-        POST={"obj_type": "Project", "obj_id": "abc", "dry_run": "1"}
+        post_params={"obj_type": "Project", "obj_id": "abc", "dry_run": "1"}
     )
     response = raw_run_duplicate(request, conn=None)
     assert "error" in json.loads(response.content)
 
 
 def test_run_duplicate_submits_and_stores_job():
-    request = FakeRequest(POST={
+    request = FakeRequest(post_params={
         "obj_type": "Project", "obj_id": "51,52", "dry_run": "1",
         "skip_annotations": "1", "skip_rois": "0",
     })
@@ -257,7 +261,7 @@ def test_run_duplicate_submits_and_stores_job():
 
 def test_run_duplicate_handles_submit_exception():
     request = FakeRequest(
-        POST={"obj_type": "Project", "obj_id": "51", "dry_run": "1"}
+        post_params={"obj_type": "Project", "obj_id": "51", "dry_run": "1"}
     )
     with patch.object(
         views, "_submit_duplicate", side_effect=RuntimeError("boom")
@@ -269,7 +273,7 @@ def test_run_duplicate_handles_submit_exception():
 # --- check_duplicate() ------------------------------------------------
 
 def test_check_duplicate_unknown_job():
-    request = FakeRequest(GET={"job_id": "nope"})
+    request = FakeRequest(get_params={"job_id": "nope"})
     response = raw_check_duplicate(request, conn=None)
     assert json.loads(response.content) == {
         "finished": True, "error": "Unknown or expired job."
@@ -277,7 +281,7 @@ def test_check_duplicate_unknown_job():
 
 
 def test_check_duplicate_still_running():
-    request = FakeRequest(GET={"job_id": "job-1"})
+    request = FakeRequest(get_params={"job_id": "job-1"})
     request.session[views.JOB_SESSION_KEY] = {
         "job-1": {"obj_type": "Project", "obj_ids": [51], "dry_run": True}
     }
@@ -298,7 +302,7 @@ def test_check_duplicate_still_running():
 
 
 def test_check_duplicate_finished_success_pops_job():
-    request = FakeRequest(GET={"job_id": "job-1"})
+    request = FakeRequest(get_params={"job_id": "job-1"})
     request.session[views.JOB_SESSION_KEY] = {
         "job-1": {"obj_type": "Project", "obj_ids": [51], "dry_run": True}
     }
@@ -324,7 +328,7 @@ def test_check_duplicate_finished_success_pops_job():
 
 
 def test_check_duplicate_handle_gone_reports_cleanly():
-    request = FakeRequest(GET={"job_id": "job-1"})
+    request = FakeRequest(get_params={"job_id": "job-1"})
     request.session[views.JOB_SESSION_KEY] = {
         "job-1": {"obj_type": "Project", "obj_ids": [51], "dry_run": True}
     }
